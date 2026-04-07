@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loss Function Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0f12;
+    --surface:   #13161b;
+    --surface2:  #1a1e25;
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.12);
+    --text:      #e8e6de;
+    --muted:     #7a7870;
+    --accent:    #c8f048;
+    --mse:       #3ecf8e;
+    --ce:        #818cf8;
+    --nll:       #fb923c;
+    --danger:    #f87171;
+    --radius:    10px;
+    --mono:      'JetBrains Mono', monospace;
+    --serif:     'Instrument Serif', serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    min-height: 100vh;
+    padding: 32px 24px;
+  }
+
+  header {
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+
+  header h1 {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text);
+    letter-spacing: -0.3px;
+    margin-bottom: 6px;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  .tab-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    background: var(--surface);
+    transition: all 0.15s;
+    font-family: var(--mono);
+    letter-spacing: 0.3px;
+  }
+
+  .tab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+  .tab.active-mse  { background: rgba(62,207,142,0.12); color: var(--mse);  border-color: rgba(62,207,142,0.35); }
+  .tab.active-ce   { background: rgba(129,140,248,0.12); color: var(--ce);   border-color: rgba(129,140,248,0.35); }
+  .tab.active-nll  { background: rgba(251,146,60,0.12);  color: var(--nll);  border-color: rgba(251,146,60,0.35); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .formula-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text);
+    margin-bottom: 14px;
+    white-space: pre;
+  }
+
+  .note {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* Sliders */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .slider-row label { font-size: 11px; color: var(--muted); min-width: 100px; }
+
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type=range].mse-range  { background: linear-gradient(to right, var(--mse) 0%, var(--border2) 0%); }
+  input[type=range].ce-range   { background: linear-gradient(to right, var(--ce)  0%, var(--border2) 0%); }
+  input[type=range].nll-range  { background: linear-gradient(to right, var(--nll) 0%, var(--border2) 0%); }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.15);
+  }
+
+  .slider-val { font-size: 13px; font-weight: 600; min-width: 44px; text-align: right; }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+  .stat {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 0.5px; margin-bottom: 4px; }
+  .stat-value { font-size: 22px; font-weight: 600; font-family: var(--mono); }
+
+  .stat-value.good   { color: var(--mse); }
+  .stat-value.medium { color: var(--nll); }
+  .stat-value.bad    { color: var(--danger); }
+
+  /* Canvas */
+  canvas {
+    width: 100%;
+    display: block;
+    border-radius: 6px;
+  }
+
+  /* Bars */
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bar-label { font-size: 11px; color: var(--muted); min-width: 72px; text-align: right; }
+  .bar-track { flex: 1; height: 14px; background: var(--bg); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
+  .bar-fill  { height: 100%; border-radius: 2px; transition: width 0.25s ease; }
+  .bar-num   { font-size: 11px; font-weight: 500; min-width: 32px; }
+
+  .meaning-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 12px;
+    line-height: 1.6;
+  }
+
+  .hl { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Loss Function Explorer</h1>
+  <p>Interactive deep dive into MSE, Cross-Entropy, and NLL Loss — drag sliders to build intuition.</p>
+</header>
+
+<div class="tab-bar">
+  <button class="tab active-mse" onclick="showTab('mse',this)">MSE Loss</button>
+  <button class="tab" onclick="showTab('ce',this)">Cross-Entropy</button>
+  <button class="tab" onclick="showTab('nll',this)">NLL Loss</button>
+</div>
+
+<!-- ───────────── MSE ───────────── -->
+<div id="panel-mse" class="panel active">
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--mse)">Mean Squared Error</div>
+      <div class="formula-box">L = (1/N) Σ (ŷ - y)²</div>
+      <div class="slider-row">
+        <label>Predicted ŷ</label>
+        <input type="range" id="mse-pred" class="mse-range" min="-30" max="30" value="10" step="1">
+        <span class="slider-val" id="mse-pred-val" style="color:var(--mse)">1.0</span>
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-label">TRUE y</div>
+          <div class="stat-value" style="color:var(--muted)">0.00</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">PREDICTED ŷ</div>
+          <div class="stat-value" id="mse-s-pred" style="color:var(--mse)">1.00</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">MSE LOSS</div>
+          <div class="stat-value" id="mse-s-loss">1.00</div>
+        </div>
+      </div>
+      <div class="meaning-box" id="mse-meaning">A prediction off by <b>1.0</b> gives loss <b>1.00</b>. Off by 2.0 → loss 4.00. Squaring makes large errors hurt disproportionately more.</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--mse)">Loss curve — error vs loss</div>
+      <canvas id="mse-canvas" height="180"></canvas>
+      <div class="note" style="margin-top:10px">Parabolic shape — a prediction 2× further away gets 4× the loss. This aggressively penalises large errors and is why the optimizer prioritises correcting the biggest mistakes first.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── CE ───────────── -->
+<div id="panel-ce" class="panel">
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--ce)">Cross-Entropy Loss</div>
+      <div class="formula-box">L = −log(p_correct)</div>
+      <div class="slider-row">
+        <label>Model confidence</label>
+        <input type="range" id="ce-conf" class="ce-range" min="1" max="99" value="55" step="1">
+        <span class="slider-val" id="ce-conf-val" style="color:var(--ce)">55%</span>
+      </div>
+      <div style="margin-bottom:12px">
+        <div id="ce-bars"></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-label">CONFIDENCE</div>
+          <div class="stat-value" id="ce-s-conf" style="color:var(--ce)">55%</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">CE LOSS</div>
+          <div class="stat-value" id="ce-s-loss">0.598</div>
+        </div>
+      </div>
+      <div class="meaning-box" id="ce-meaning">Model assigns <b>55%</b> to correct class → loss <b>0.598</b>. Being very wrong (low confidence) is punished exponentially via the log.</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--ce)">Loss curve — confidence vs loss</div>
+      <canvas id="ce-canvas" height="180"></canvas>
+      <div class="note" style="margin-top:10px">Logarithmic curve — loss explodes as confidence in the correct class approaches 0. Being very confident about the wrong answer is catastrophically penalised.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────── NLL ───────────── -->
+<div id="panel-nll" class="panel">
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title" style="color:var(--nll)">Negative Log-Likelihood</div>
+      <div class="formula-box">L = −log_prob[correct_class]</div>
+      <div class="slider-row">
+        <label>Log-probability</label>
+        <input type="range" id="nll-lp" class="nll-range" min="-500" max="-1" value="-60" step="1">
+        <span class="slider-val" id="nll-lp-val" style="color:var(--nll)">−0.60</span>
+      </div>
+      <div class="stats-row">
+        <div class="stat">
+          <div class="stat-label">LOG_PROB</div>
+          <div class="stat-value" id="nll-s-lp" style="color:var(--nll)">-0.60</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">PROB</div>
+          <div class="stat-value" id="nll-s-prob">0.549</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">NLL LOSS</div>
+          <div class="stat-value" id="nll-s-loss">0.60</div>
+        </div>
+      </div>
+      <div class="meaning-box">NLL expects <b>log-probabilities</b> (from log_softmax). CE expects raw logits and applies log_softmax internally. They are <b>mathematically identical</b> when used correctly — CE = NLL(log_softmax(logits)).</div>
+      <div class="formula-box" style="margin-top:12px;font-size:11px">CE == NLL(log_softmax(logits))  ✓
+Use CE   → pass raw logits
+Use NLL  → pass log_softmax output</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color:var(--nll)">CE vs NLL — same curve</div>
+      <canvas id="nll-canvas" height="180"></canvas>
+      <div class="note" style="margin-top:10px">Both produce the same loss values. NLL exists because sometimes log_softmax is precomputed (e.g. for beam search) and you don't want to recompute it.</div>
+      <div class="formula-box" style="margin-top:12px;font-size:11px">Quick reference:
+  Q=0.99 → loss ≈ 0.01   (confident, correct)
+  Q=0.50 → loss ≈ 0.69   (uncertain)
+  Q=0.10 → loss ≈ 2.30   (confident, wrong)
+  Q=0.01 → loss ≈ 4.60   (very wrong)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tab switching ─────────────────────────────────────────────────
+const activeClass = { mse:'active-mse', ce:'active-ce', nll:'active-nll' };
+function showTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t => { Object.values(activeClass).forEach(c => t.classList.remove(c)); });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  el.classList.add(activeClass[id]);
+  setTimeout(() => { drawAll(); }, 10);
+}
+
+// ── Canvas helpers ────────────────────────────────────────────────
+function setupCanvas(id, h=180) {
+  const c = document.getElementById(id);
+  if (!c) return null;
+  const dpr = window.devicePixelRatio || 1;
+  c.width  = c.offsetWidth * dpr;
+  c.height = h * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { ctx, W: c.offsetWidth, H: h };
+}
+
+function drawCurve(id, xVals, yVals, color, markerX, markerY, h=180) {
+  const r = setupCanvas(id, h);
+  if (!r) return;
+  const { ctx, W, H } = r;
+  const pad = { t:12, r:12, b:30, l:42 };
+  const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+  const xMin = xVals[0], xMax = xVals[xVals.length-1];
+  const yMin = 0, yMax = Math.max(...yVals) * 1.08;
+  const sx = x => pad.l + (x-xMin)/(xMax-xMin)*iW;
+  const sy = y => pad.t + iH - Math.min((y-yMin)/(yMax-yMin),1)*iH;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 0.5;
+  [0.25,0.5,0.75,1].forEach(f => {
+    const y = pad.t + iH*(1-f);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l+iW, y); ctx.stroke();
+  });
+
+  // Curve
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  xVals.forEach((x,i) => { const py=sy(yVals[i]); i===0?ctx.moveTo(sx(x),py):ctx.lineTo(sx(x),py); });
+  ctx.stroke();
+
+  // Marker
+  if (markerX !== null) {
+    const mx=sx(markerX), my=sy(Math.min(markerY,yMax));
+    ctx.strokeStyle='rgba(255,255,255,0.15)'; ctx.lineWidth=0.5; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(mx,my); ctx.lineTo(mx,pad.t+iH); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=color; ctx.beginPath(); ctx.arc(mx,my,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0d0f12'; ctx.beginPath(); ctx.arc(mx,my,2.5,0,Math.PI*2); ctx.fill();
+  }
+
+  // Axis labels
+  ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.font='10px JetBrains Mono,monospace'; ctx.textAlign='right';
+  [0, Math.round(yMax*0.5*100)/100, Math.round(yMax*100)/100].forEach(v => {
+    ctx.fillText(v.toFixed(1), pad.l-4, sy(v)+3);
+  });
+  ctx.textAlign='center';
+  [xMin,(xMin+xMax)/2,xMax].forEach(v => {
+    ctx.fillText(typeof v==='number'?v.toFixed(1):v, sx(v), H-6);
+  });
+}
+
+// ── MSE ───────────────────────────────────────────────────────────
+function updateMSE() {
+  const pred = parseInt(document.getElementById('mse-pred').value)/10;
+  const loss = pred*pred;
+  document.getElementById('mse-pred-val').textContent = pred.toFixed(1);
+  document.getElementById('mse-s-pred').textContent   = pred.toFixed(2);
+  document.getElementById('mse-s-loss').textContent   = loss.toFixed(3);
+  const lv = document.getElementById('mse-s-loss');
+  lv.className = 'stat-value ' + (loss < 1 ? 'good' : loss < 5 ? 'medium' : 'bad');
+  document.getElementById('mse-meaning').innerHTML =
+    `A prediction off by <b>${Math.abs(pred).toFixed(1)}</b> gives loss <b>${loss.toFixed(2)}</b>. Off by ${(Math.abs(pred)*2).toFixed(1)} → loss ${(pred*pred*4).toFixed(2)}. Squaring makes large errors hurt disproportionately more.`;
+  const xs=[], ys=[];
+  for(let e=-3;e<=3;e+=0.05){xs.push(e);ys.push(e*e);}
+  updateRange('mse-pred', xs, '#3ecf8e');
+  drawCurve('mse-canvas', xs, ys, '#3ecf8e', pred, loss);
+}
+
+// ── CE ────────────────────────────────────────────────────────────
+function renderCEBars(conf) {
+  const rest = (1-conf)/2;
+  const data = [
+    {label:'"cat" ✓', p:conf, color:'#818cf8'},
+    {label:'"dog"',   p:rest, color:'rgba(129,140,248,0.3)'},
+    {label:'"bird"',  p:rest, color:'rgba(129,140,248,0.15)'},
+  ];
+  document.getElementById('ce-bars').innerHTML = data.map(d=>`
+    <div class="bar-row">
+      <span class="bar-label">${d.label}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(d.p*100)}%;background:${d.color}"></div></div>
+      <span class="bar-num" style="color:${d===data[0]?'#818cf8':'var(--muted)'}">${d.p.toFixed(2)}</span>
+    </div>`).join('');
+}
+
+function updateCE() {
+  const conf = parseInt(document.getElementById('ce-conf').value)/100;
+  const loss = -Math.log(conf);
+  document.getElementById('ce-conf-val').textContent  = Math.round(conf*100)+'%';
+  document.getElementById('ce-s-conf').textContent    = Math.round(conf*100)+'%';
+  document.getElementById('ce-s-loss').textContent    = loss.toFixed(3);
+  const lv = document.getElementById('ce-s-loss');
+  lv.className = 'stat-value ' + (loss<0.5?'good':loss<1.5?'medium':'bad');
+  renderCEBars(conf);
+  document.getElementById('ce-meaning').innerHTML =
+    `Model assigns <b>${Math.round(conf*100)}%</b> to correct class → loss <b>${loss.toFixed(3)}</b>. ${loss<0.5?'Great — model is confident and correct.':loss<1.5?'Decent — model leans toward right answer.':'Poor — model is uncertain or wrong. Large gradient correction incoming.'}`;
+  const xs=[], ys=[];
+  for(let p=0.01;p<=0.99;p+=0.01){xs.push(p);ys.push(-Math.log(p));}
+  updateRange('ce-conf', [0,1], '#818cf8');
+  drawCurve('ce-canvas', xs, ys, '#818cf8', conf, loss);
+}
+
+// ── NLL ───────────────────────────────────────────────────────────
+function updateNLL() {
+  const lp   = parseInt(document.getElementById('nll-lp').value)/100;
+  const prob  = Math.exp(lp);
+  const loss  = -lp;
+  document.getElementById('nll-lp-val').textContent  = lp.toFixed(2);
+  document.getElementById('nll-s-lp').textContent    = lp.toFixed(2);
+  document.getElementById('nll-s-prob').textContent  = prob.toFixed(3);
+  document.getElementById('nll-s-loss').textContent  = loss.toFixed(2);
+  const lv = document.getElementById('nll-s-loss');
+  lv.className = 'stat-value ' + (loss<0.5?'good':loss<1.5?'medium':'bad');
+  const xs=[], ys=[];
+  for(let p=0.01;p<=0.99;p+=0.01){xs.push(p);ys.push(-Math.log(p));}
+  updateRange('nll-lp', [-5,0], '#fb923c');
+  drawCurve('nll-canvas', xs, ys, '#fb923c', prob, loss);
+}
+
+// ── Range track fill helper ────────────────────────────────────────
+function updateRange(id, domain, color) {
+  const el = document.getElementById(id);
+  const pct = (el.value - el.min) / (el.max - el.min) * 100;
+  el.style.background = `linear-gradient(to right, ${color} ${pct}%, rgba(255,255,255,0.08) ${pct}%)`;
+}
+
+function drawAll() { updateMSE(); updateCE(); updateNLL(); }
+
+document.getElementById('mse-pred').addEventListener('input', updateMSE);
+document.getElementById('ce-conf').addEventListener('input', updateCE);
+document.getElementById('nll-lp').addEventListener('input', updateNLL);
+window.addEventListener('resize', drawAll);
+setTimeout(drawAll, 100);
+</script>
+</body>
+</html>
